@@ -9,7 +9,7 @@
 ## 🚀 Быстрый Старт (скрипт установки):
 
 ```bash
-bash <(curl -Ls (https://raw.githubusercontent.com/drix-x/pve-infrastructure-scripts/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/drix-x/pve-infrastructure-scripts/main/install.sh)
 ```
 
 ## 🚀 Основные возможности и защитные механизмы
