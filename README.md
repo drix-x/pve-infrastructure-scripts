@@ -6,6 +6,11 @@
 Разработан с упором на максимальную надежность (**Production-Ready**) и сквозную защиту от повреждения данных при сетевых или системных сбоях.
 
 ---
+## 🚀 Быстрый Старт (скрипт установки):
+
+```bash
+bash <(curl -Ls (https://raw.githubusercontent.com/drix-x/pve-infrastructure-scripts/main/install.sh)
+```
 
 ## 🚀 Основные возможности и защитные механизмы
 
