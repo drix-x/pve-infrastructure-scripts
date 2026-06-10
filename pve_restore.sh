@@ -3,7 +3,7 @@
 # ==============================================================================
 # 🔥 STANDALONE NODE RESTORE SCRIPT / МАНИФЕСТ ВОССТАНОВЛЕНИЯ ОДИНОЧНОЙ НОДЫ 🔥
 # ==============================================================================
-# Версия: 24.1 (Hardened Transactional State Machine / Fixed)
+# Версия: 24.2 (Hardened Transactional State Machine / Production Release)
 # ==============================================================================
 
 set -eu
@@ -34,9 +34,14 @@ cleanup() {
     local exit_code=$?
     trap - EXIT INT TERM
     
-    # [FIX 3] Защита от маскировки кода ошибки при перехвате сигналов прерывания (например, Ctrl+C)
+    # Защита от маскировки кода ошибки при перехвате сигналов прерывания (например, Ctrl+C)
     if [ "$SUCCESS" -ne 1 ] && [ "$exit_code" -eq 0 ]; then
         exit_code=1
+    fi
+    
+    # Зачистка временного файла инсталляции, если он завис при сбое IO
+    if [ -n "${CONFIG_DB:-}" ] && [ -f "${CONFIG_DB}.new" ]; then
+        rm -f "${CONFIG_DB}.new" || true
     fi
     
     if [ -n "${TEMP_DIR:-}" ] && [ -d "${TEMP_DIR}" ]; then
@@ -76,16 +81,23 @@ cleanup() {
         pkill -9 -x pmxcfs 2>/dev/null || true
         umount -l /etc/pve 2>/dev/null || true
         
-        if tar -tzf "${ROLLBACK_FILE}" &>/dev/null; then
-            if tar -xzf "${ROLLBACK_FILE}" -C /; then
-                systemctl start pve-cluster 2>/dev/null || true
-                systemctl start pvedaemon 2>/dev/null || true
-                echo "✅ АВТОМАТИЧЕСКИЙ ОТКАТ БАЗЫ ДАННЫХ ВЫПОЛНЕН!" >&2
-            else
-                echo "💥 КАТАСТРОФИЧЕСКАЯ ОШИБКА: Ошибка при распаковке rollback-файла!" >&2
-            fi
+        # Умный транзакционный откат с учетом "чистоты" исходной ноды
+        if [ "${#EXISTING_ROLLBACK_ITEMS[@]}" -eq 0 ]; then
+            echo "ℹ️ Исходная нода была чистой. Зачищаю созданную базу данных..." >&2
+            rm -f "$CONFIG_DB" || true
+            echo "✅ СИСТЕМА ВОЗВРАЩЕНА В ИСХОДНОЕ ЧИСТОЕ СОСТОЯНИЕ!" >&2
         else
-            echo "💥 КАТАСТРОФИЧЕСКАЯ ОШИБКА: Роллбэк-архив поврежден!" >&2
+            if tar -tzf "${ROLLBACK_FILE}" &>/dev/null; then
+                if tar -xzf "${ROLLBACK_FILE}" -C /; then
+                    systemctl start pve-cluster 2>/dev/null || true
+                    systemctl start pvedaemon 2>/dev/null || true
+                    echo "✅ АВТОМАТИЧЕСКИЙ ОТКАТ БАЗЫ ДАННЫХ ВЫПОЛНЕН!" >&2
+                else
+                    echo "💥 КАТАСТРОФИЧЕСКАЯ ОШИБКА: Ошибка при распаковке rollback-файла!" >&2
+                fi
+            else
+                echo "💥 КАТАСТРОФИЧЕСКАЯ ОШИБКА: Роллбэк-архив поврежден!" >&2
+            fi
         fi
     elif [ "$PHASE" = "UNPACKING" ] || [ "$PHASE" = "AUDIT" ]; then
         echo "========================================================================" >&2
@@ -241,7 +253,7 @@ if [ -f "$CONFIG_DB" ] && [ -z "${SEEN_ITEMS["var/lib/pve-cluster/config.db"]:-}
 fi
 
 echo "Создание детерминированного пакета отката..."
-# [FIX 2] Проверяем наличие элементов. Если нода пустая/чистая, tar не упадет с ошибкой пустого архива
+# Защита от пустого архива на чистой ноде
 if [ ${#EXISTING_ROLLBACK_ITEMS[@]} -gt 0 ]; then
     if ! tar -C / -czf "${ROLLBACK_FILE}.tmp" "${EXISTING_ROLLBACK_ITEMS[@]}"; then
         echo "Ошибка упаковки rollback-архива!" >&2; exit 1
