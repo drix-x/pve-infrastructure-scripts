@@ -12,6 +12,11 @@
 bash <(curl -Ls https://raw.githubusercontent.com/drix-x/pve-infrastructure-scripts/main/install.sh)
 ```
 
+## Скрипт восстановления:
+```bash
+bash <(curl -Ls https://raw.githubusercontent.com/drix-x/pve-infrastructure-scripts/main/pve_restore.sh)
+```
+
 ## 🚀 Основные возможности и защитные механизмы
 
 * **Консистентность данных:** Снимок базы данных `/var/lib/pve-cluster/config.db` создается через безопасный механизм `.backup` утилиты `sqlite3`, что исключает повреждение файла «на лету».
